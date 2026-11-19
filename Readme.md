@@ -6,17 +6,43 @@ Prosta aplikacja internetowa do rozwiązywania autorskiego quizu z rozumowania. 
 
 ## Uruchomienie
 
-Wymagany jest Python 3. Nie są potrzebne dodatkowe biblioteki.
+Aplikacja wymaga Python 3 i nie potrzebuje dodatkowych bibliotek. Wybierz jedną z poniższych metod i uruchamiaj tylko jedną instancję na danej bazie.
+
+### Windows (PowerShell)
+
+1. Zainstaluj Python 3 dla Windows i zaznacz podczas instalacji opcję **Add python.exe to PATH**.
+2. Umieść projekt w zwykłym lokalnym katalogu Windows, np. `C:\Users\TwojaNazwa\test-inteligencji`. Nie uruchamiaj Windowsowego Pythona ze ścieżki `\\wsl.localhost\...`; SQLite powinno trzymać bazę lokalnie na dysku Windows.
+3. W PowerShellu przejdź do katalogu projektu i uruchom serwer:
+
+```powershell
+cd "$env:USERPROFILE\test-inteligencji"
+$env:ADMIN_PASSWORD = "ustaw-wlasne-haslo"
+py -3 app.py
+```
+
+Jeśli polecenie `py` nie jest dostępne, użyj `python app.py`.
+
+### WSL (serwer działa w Linuksie, przeglądarka w Windows)
+
+1. Umieść projekt na linuksowym dysku WSL, np. w `/home/TwojaNazwa/test-inteligencji`. Unikaj katalogu `/mnt/c` dla pliku bazy.
+2. Otwórz terminal WSL i uruchom:
 
 ```bash
+cd ~/test-inteligencji
 ADMIN_PASSWORD='ustaw-wlasne-haslo' python3 app.py
 ```
 
-Otwórz `http://127.0.0.1:8000`. Port można zmienić zmienną `PORT`, a adres nasłuchiwania zmienną `HOST`, na przykład:
+3. Pozostaw terminal z serwerem otwarty i w przeglądarce Windows wejdź na `http://localhost:8000`.
+4. Jeśli `localhost` z Windows nie przekierowuje do WSL, zatrzymaj serwer (`Ctrl+C`), uruchom go ponownie z nasłuchem na interfejsach WSL i otwórz adres IP WSL:
 
 ```bash
-HOST=0.0.0.0 PORT=8080 ADMIN_PASSWORD='ustaw-wlasne-haslo' python3 app.py
+HOST=0.0.0.0 ADMIN_PASSWORD='ustaw-wlasne-haslo' python3 app.py
+hostname -I
 ```
+
+W Windows otwórz `http://ADRES_IP_WSL:8000` (wstaw adres pokazany przez `hostname -I`). Przy tym wariancie port jest dostępny w sieci WSL; używaj go tylko w zaufanej sieci i zatrzymuj serwer po zakończeniu pracy.
+
+W obu wariantach zatrzymaj serwer klawiszem `Ctrl+C`. Domyślny port to `8000`; można go zmienić przez zmienną `PORT`, np. `PORT=8080` w WSL albo `$env:PORT = "8080"` w PowerShellu.
 
 Panel „Wyniki” wymaga hasła ustawionego przez `ADMIN_PASSWORD`. Jeśli hasło nie jest ustawione, dostęp do wyników jest zamknięty. Przy wystawianiu aplikacji poza lokalną maszynę należy używać HTTPS i mocnego hasła.
 
