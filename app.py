@@ -253,7 +253,10 @@ class Handler(BaseHTTPRequestHandler):
             self.server.sessions[token] = drawn
             self.send_response(200)
             self.send_header("Set-Cookie", f"quiz_session={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600")
-            raw = json.dumps([{k: q[k] for k in ("category", "level", "points", "prompt", "options", "image_svg")} for q in drawn], ensure_ascii=False).encode()
+            # image_svg występuje tylko w zadaniach obrazkowych.
+            raw = json.dumps([{k: q[k] for k in ("category", "level", "points", "prompt", "options")} |
+                              ({"image_svg": q["image_svg"]} if q.get("image_svg") else {})
+                              for q in drawn], ensure_ascii=False).encode()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
             self.end_headers()
