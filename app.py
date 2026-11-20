@@ -189,21 +189,23 @@ HTML = r'''<!doctype html>
 <header><strong>Test rozumowania</strong><nav><button id="homeBtn" class="link">Test</button><button id="resultsBtn" class="link">Wyniki</button></nav></header>
 <main class="wrap">
 <section id="intro" class="card"><div class="eyebrow">20 pytań · około 10–15 minut</div><h1>Sprawdź swoje rozumowanie</h1><p class="muted">Test obejmuje ciągi i reguły, matematykę, wzory oraz wyobraźnię przestrzenną. Podaj imię lub pseudonim i przedział wiekowy, aby porównać wynik z dotychczasową średnią w tej grupie.</p><div class="notice">To autorski quiz edukacyjny, a nie standaryzowany test psychologiczny ani diagnoza inteligencji.</div><div class="row"><div><label for="name">Imię lub pseudonim</label><input id="name" maxlength="60" autocomplete="name" placeholder="Np. Alex"></div><div><label for="age">Przedział wiekowy</label><select id="age"><option value="">Wybierz przedział</option><option>0-20</option><option>21-40</option><option>41-60</option><option>61-80</option><option>81-100</option></select></div></div><div class="actions"><span></span><button id="start">Rozpocznij test</button></div></section>
-<section id="quiz" class="card hidden"><div class="eyebrow" id="level"></div><h1 id="quizTitle">Pytanie</h1><div class="category" id="category"></div><div class="progress"><span id="bar"></span></div><div id="prompt" class="question"></div><div id="questionImage"></div><div id="options"></div><div class="actions"><button id="prev" class="secondary">← Wstecz</button><button id="next">Dalej →</button><button id="submit" class="hidden">Wyślij test</button></div><p id="unanswered" class="muted hidden" style="font-size:13px">Możesz wrócić do pytań przyciskami Wstecz i Dalej.</p></section>
+<section id="quiz" class="card hidden"><div class="eyebrow" id="level"></div><p>Czas testu: <strong id="timer" role="timer">00:00</strong></p><h1 id="quizTitle">Pytanie</h1><div class="category" id="category"></div><div class="progress"><span id="bar"></span></div><div id="prompt" class="question"></div><div id="questionImage"></div><div id="options"></div><div class="actions"><button id="prev" class="secondary">← Wstecz</button><button id="next">Dalej →</button><button id="submit" class="hidden">Wyślij test</button></div><p id="unanswered" class="muted hidden" style="font-size:13px">Możesz wrócić do pytań przyciskami Wstecz i Dalej.</p></section>
 <section id="result" class="card result hidden"></section>
 <section id="results" class="card hidden"><div class="eyebrow">Panel wyników</div><h1>Wyniki uczestników</h1><p class="muted">Zestawienie zapisanych podejść. Średnie w porównaniu uczestnika liczone są dla jego grupy wiekowej.</p><div id="adminLogin"><label for="adminPassword">Hasło administratora</label><input type="password" id="adminPassword" autocomplete="current-password"><div class="actions"><span></span><button id="loadResults">Pokaż wyniki</button></div><p id="adminError" class="muted"></p></div><div id="resultsContent"></div><div class="actions"><span></span><button class="secondary" id="backTest">Wróć do testu</button></div></section>
 </main><footer>Wyniki są przechowywane lokalnie w bazie SQLite na serwerze tej aplikacji.</footer>
 <script>
-const $=s=>document.querySelector(s);let questions=[],answers={},index=0,participant={};
+const $=s=>document.querySelector(s);let questions=[],answers={},index=0,participant={},startedAt=null,finishedMs=null,timerInterval=null,submitting=false;
+function formatDuration(ms){if(ms===null||ms===undefined)return "?";const seconds=Math.floor(ms/1000);return `${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`}
+function updateTimer(){if(startedAt!==null)$("#timer").textContent=formatDuration(finishedMs??(performance.now()-startedAt))}
 function show(which){for(const id of ['intro','quiz','result','results'])$('#'+id).classList.toggle('hidden',id!==which)}
 $('#homeBtn').onclick=()=>show('intro');$('#backTest').onclick=()=>show('intro');
-$('#start').onclick=async()=>{const name=$('#name').value.trim(),age=$('#age').value;if(!name){$('#name').focus();return}if(!age){$('#age').focus();return}participant={name,age};const res=await fetch('/api/questions');questions=await res.json();answers={};index=0;render();show('quiz')};
+$('#start').onclick=async()=>{const name=$('#name').value.trim(),age=$('#age').value;if(!name){$('#name').focus();return}if(!age){$('#age').focus();return}const button=$('#start');button.disabled=true;try{const startTime=performance.now();const res=await fetch('/api/questions');if(!res.ok)throw new Error();const drawn=await res.json();participant={name,age};questions=drawn;answers={};index=0;startedAt=startTime;finishedMs=null;clearInterval(timerInterval);updateTimer();timerInterval=setInterval(updateTimer,250);render();show('quiz')}catch(e){alert('Nie udało się rozpocząć testu. Spróbuj ponownie.')}finally{button.disabled=false}};
 function render(){const q=questions[index];$('#level').textContent=`Pytanie ${index+1} z ${questions.length} · ${q.level} · ${q.points} pkt`;$('#quizTitle').textContent=q.category;$('#category').textContent='Wybierz jedną odpowiedź';$('#prompt').textContent=q.prompt;$('#questionImage').innerHTML=q.image_svg||'';$('#bar').style.width=`${(index+1)/questions.length*100}%`;$('#options').replaceChildren(...q.options.map((v,i)=>{const l=document.createElement('label');l.className='option';const r=document.createElement('input');r.type='radio';r.name='answer';r.value=i;r.checked=answers[index]===i;r.onchange=()=>answers[index]=i;l.append(r,document.createTextNode(v));return l}));$('#prev').disabled=index===0;$('#next').classList.toggle('hidden',index===questions.length-1);$('#submit').classList.toggle('hidden',index!==questions.length-1);$('#unanswered').classList.toggle('hidden',Object.keys(answers).length===questions.length)}
 $('#prev').onclick=()=>{if(index>0){index--;render()}};$('#next').onclick=()=>{if(index<questions.length-1){index++;render()}};
-$('#submit').onclick=async()=>{if(Object.keys(answers).length!==questions.length){$('#unanswered').classList.remove('hidden');return}const res=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:participant.name,age_group:participant.age,answers})});const data=await res.json();if(!res.ok){alert(data.error||'Nie udało się zapisać wyniku.');return}$('#result').innerHTML=`<div class="eyebrow">Test zakończony</div><h1>Twój wynik</h1><div class="score">${data.percentage}%</div><p>Zdobyte punkty: <strong>${data.score} / ${data.max_score}</strong></p><p>Średnia w grupie ${escapeHtml(participant.age)}: <strong>${data.group_average === null?'brak wcześniejszych wyników':data.group_average+'%'}</strong></p><p class="muted">${data.group_count?`Średnia na podstawie ${data.group_count} wcześniejszych podejść.`:'Będziesz pierwszą osobą w tej grupie wiekowej.'}</p><div class="notice">Wynik opisuje rezultat tego quizu. Nie jest pomiarem IQ ani oceną kliniczną.</div><button id="again">Wróć na początek</button>`;$('#again').onclick=()=>show('intro');show('result')};
+$('#submit').onclick=async()=>{if(Object.keys(answers).length!==questions.length){$('#unanswered').classList.remove('hidden');return}if(submitting)return;finishedMs=Math.round(performance.now()-startedAt);updateTimer();clearInterval(timerInterval);submitting=true;$('#submit').disabled=true;try{const res=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:participant.name,age_group:participant.age,answers,duration_ms:finishedMs})});const data=await res.json();if(!res.ok){throw new Error(data.error||'Nie uda\u0142o si\u0119 zapisa\u0107 wyniku.')}$('#result').innerHTML=`<div class="eyebrow">Test zakończony</div><h1>Twój wynik</h1><div class="score">${data.percentage}%</div><p>Czas testu: <strong>${formatDuration(data.duration_ms)}</strong></p><p>Zdobyte punkty: <strong>${data.score} / ${data.max_score}</strong></p><p>Średnia w grupie ${escapeHtml(participant.age)}: <strong>${data.group_average === null?'brak wcześniejszych wyników':data.group_average+'%'}</strong></p><p class="muted">${data.group_count?`Średnia na podstawie ${data.group_count} wcześniejszych podejść.`:'Będziesz pierwszą osobą w tej grupie wiekowej.'}</p><div class="notice">Wynik opisuje rezultat tego quizu. Nie jest pomiarem IQ ani oceną kliniczną.</div><button id="again">Wróć na początek</button>`;$('#again').onclick=()=>show('intro');show('result')}catch(e){finishedMs=null;updateTimer();timerInterval=setInterval(updateTimer,250);alert(e.message||'Nie udało się zapisać wyniku. Spróbuj ponownie.')}finally{submitting=false;$('#submit').disabled=false}};
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('#resultsBtn').onclick=()=>{show('results');$('#adminPassword').value='';$('#resultsContent').replaceChildren();$('#adminError').textContent=''};
-$('#loadResults').onclick=async()=>{const password=$('#adminPassword').value;$('#resultsContent').textContent='Ładowanie…';try{const r=await fetch('/api/results',{headers:{'X-Admin-Password':password}});const d=await r.json();if(!r.ok){$('#resultsContent').replaceChildren();$('#adminError').textContent=d.error||'Brak dostępu';return}$('#adminError').textContent='';if(!d.results.length){$('#resultsContent').textContent='Nie zapisano jeszcze żadnych wyników.';return}const t=document.createElement('table');t.innerHTML='<thead><tr><th>Data</th><th>Uczestnik</th><th>Wiek</th><th>Punkty</th><th>Wynik</th></tr></thead>';const b=document.createElement('tbody');for(const x of d.results){const tr=document.createElement('tr');for(const v of [new Date(x.created_at).toLocaleString('pl-PL'),x.name,x.age_group,`${x.score} / ${x.max_score}`,`${x.percentage}%`]){const td=document.createElement('td');td.textContent=v;tr.append(td)}b.append(tr)}t.append(b);const wrap=document.createElement('div');wrap.className='table-wrap';wrap.append(t);$('#resultsContent').replaceChildren(wrap)}catch(e){$('#resultsContent').textContent='Nie można pobrać wyników.'}};
+$('#loadResults').onclick=async()=>{const password=$('#adminPassword').value;$('#resultsContent').textContent='Ładowanie…';try{const r=await fetch('/api/results',{headers:{'X-Admin-Password':password}});const d=await r.json();if(!r.ok){$('#resultsContent').replaceChildren();$('#adminError').textContent=d.error||'Brak dostępu';return}$('#adminError').textContent='';if(!d.results.length){$('#resultsContent').textContent='Nie zapisano jeszcze żadnych wyników.';return}const t=document.createElement('table');t.innerHTML='<thead><tr><th>Data</th><th>Uczestnik</th><th>Wiek</th><th>Punkty</th><th>Wynik</th><th>Czas</th></tr></thead>';const b=document.createElement('tbody');for(const x of d.results){const tr=document.createElement('tr');for(const v of [new Date(x.created_at).toLocaleString('pl-PL'),x.name,x.age_group,`${x.score} / ${x.max_score}`,`${x.percentage}%`,formatDuration(x.duration_ms)]){const td=document.createElement('td');td.textContent=v;tr.append(td)}b.append(tr)}t.append(b);const wrap=document.createElement('div');wrap.className='table-wrap';wrap.append(t);$('#resultsContent').replaceChildren(wrap)}catch(e){$('#resultsContent').textContent='Nie można pobrać wyników.'}};
 </script></body></html>'''
 
 
@@ -224,6 +226,8 @@ def connect_db() -> sqlite3.Connection:
         answers_json TEXT NOT NULL,
         created_at TEXT NOT NULL
     )""")
+    if "duration_ms" not in {row["name"] for row in db.execute("PRAGMA table_info(results)")}:
+        db.execute("ALTER TABLE results ADD COLUMN duration_ms INTEGER")
     return db
 
 
@@ -266,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Hasło administratora jest nieprawidłowe albo nie zostało skonfigurowane."}, 401)
                 return
             with connect_db() as db:
-                rows = db.execute("SELECT name,age_group,score,max_score,percentage,created_at FROM results ORDER BY id DESC").fetchall()
+                rows = db.execute("SELECT name,age_group,score,max_score,percentage,created_at,duration_ms FROM results ORDER BY id DESC").fetchall()
             self.send_json({"results": [dict(row) for row in rows]})
         else:
             self.send_json({"error": "Nie znaleziono strony."}, 404)
@@ -284,6 +288,10 @@ class Handler(BaseHTTPRequestHandler):
             name = str(data.get("name", "")).strip()[:60]
             age = data.get("age_group")
             answers = data.get("answers")
+            duration_ms = data.get("duration_ms")
+            if (type(duration_ms) is not int or duration_ms < 0
+                    or duration_ms > 9_223_372_036_854_775_807):
+                raise ValueError
             if not name or age not in AGES or not isinstance(answers, dict) or len(answers) != 20:
                 raise ValueError
             cookie = self.headers.get("Cookie", "")
@@ -307,10 +315,10 @@ class Handler(BaseHTTPRequestHandler):
             with connect_db() as db:
                 previous = db.execute("SELECT AVG(percentage),COUNT(*) FROM results WHERE age_group=?", (age,)).fetchone()
                 avg = round(previous[0], 1) if previous[1] else None
-                db.execute("INSERT INTO results(name,age_group,score,max_score,percentage,answers_json,created_at) VALUES(?,?,?,?,?,?,?)",
-                           (name, age, score, max_score, percent, json.dumps(saved_answers), now))
+                db.execute("INSERT INTO results(name,age_group,score,max_score,percentage,answers_json,created_at,duration_ms) VALUES(?,?,?,?,?,?,?,?)",
+                           (name, age, score, max_score, percent, json.dumps(saved_answers), now, duration_ms))
             self.send_json({"score": score, "max_score": max_score, "percentage": percent,
-                            "group_average": avg, "group_count": previous[1]})
+                            "duration_ms": duration_ms, "group_average": avg, "group_count": previous[1]})
         except (ValueError, TypeError, json.JSONDecodeError):
             self.send_json({"error": "Dane są nieprawidłowe. Uzupełnij wszystkie 20 odpowiedzi."}, 400)
 

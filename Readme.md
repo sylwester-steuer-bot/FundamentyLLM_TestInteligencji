@@ -63,6 +63,20 @@ Test jest celowo łagodniejszy niż pierwotna propozycja: nie losuje poziomów �
 
 ## Dane i średnia grupy
 
+### Pomiar czasu
+
+Po kliknięciu „Rozpocznij test” (po uzupełnieniu danych uczestnika) uruchamia się widoczny licznik w formacie minuty:sekundy. Pomiar kończy kliknięcie „Wyślij test” przy komplecie odpowiedzi. Obejmuje przechodzenie wstecz, przerwy i czas spędzony w innej karcie; nie obejmuje oczekiwania na zapis wyniku. Po błędzie wysyłania pomiar jest wznawiany i obejmuje czas do kolejnej próby. Nowe rozpoczęcie testu zeruje licznik, a odświeżenie strony wymaga rozpoczęcia od nowa.
+
+Czas jest wyświetlany w podsumowaniu i panelu „Wyniki” oraz zapisywany w bazie jako `duration_ms` (milisekundy). Kolumna jest dodawana automatycznie do istniejącej bazy; wcześniejsze wyniki mają brak czasu, wyświetlany jako „—”. Pomiar korzysta z zegara monotonicznego przeglądarki i jest przesyłany przez klienta, więc nie jest zabezpieczony przed manipulacją. Obecna punktacja i średnie procentowe pozostają bez zmian.
+
+### Propozycja punktacji uwzględniającej czas — do rozważenia
+
+Proponowany dodatkowy wskaźnik sprawności: `W = P × (0,8 + 0,2 × min(1, T_ref / T))`, gdzie `P` to obecny wynik procentowy, `T` to czas testu, a `T_ref` to czas referencyjny. Dla czasu zerowego nie wyliczamy wskaźnika. Wynik mieści się w zakresie 0–100; szybkość nie daje punktów za błędne odpowiedzi. Przy czasie do `T_ref` wskaźnik jest równy `P`, a dłuższy czas obniża go najwyżej o 20% wartości `P`.
+
+Przykład wyłącznie ilustracyjny: dla `T_ref = 10 minut` i wyniku 80% wskaźnik wyniesie 80 przy czasie 8 lub 10 minut, 74,7 przy 15 minutach oraz 72 przy 20 minutach. Wagę 20% i czas referencyjny trzeba sprawdzić na zebranych danych; 10 minut nie jest ustaloną normą. Można wyznaczać `T_ref` jako medianę czasu kompletnych, poprawnie zapisanych prób w danej grupie wiekowej i tej samej wersji testu, po zebraniu np. 30 takich prób, z wykluczeniem udokumentowanych zakłóceń pomiaru. Do tego czasu prezentować wyłącznie punkty i czas osobno.
+
+Przed wdrożeniem należy ustalić sposób traktowania przerw, potrzeb dostępności oraz wersjonowania wzoru i czasu referencyjnego. Należy zachować osobno surowe punkty, procent i czas, aby porównania były czytelne i możliwe do ponownego przeliczenia. To propozycja wskaźnika dla quizu edukacyjnego, a nie norma psychologiczna ani pomiar IQ. **Wzór nie jest obecnie zaimplementowany.**
+
 Wyniki są przechowywane w pliku `results.db` w katalogu aplikacji (SQLite). Można wskazać inną lokalizację przez `TEST_DB_PATH`. Uruchamiaj aplikację i bazę na tym samym systemie plików co interpreter: przy Windows trzymaj projekt na dysku Windows, a przy WSL na linuksowym dysku WSL. Unikaj ścieżek `\\wsl.localhost\...` dla procesu Windows oraz OneDrive i dysków sieciowych. Baza zapisuje imię/pseudonim, grupę wiekową, punkty, procent, odpowiedzi i czas wysłania.
 
 SQLite czeka do 15 sekund na zwolnienie chwilowej blokady. Uruchamiaj tylko jedną kopię aplikacji na tej samej bazie. Przy pracy z Windows i WSL trzymaj bazę na lokalnym dysku systemu, na którym działa serwer; nie kieruj `TEST_DB_PATH` do folderu synchronizowanego z OneDrive ani do sieciowego dysku. W WSL ustaw bazę np. na `~/test-inteligencji/results.db`; w Windows używaj folderu lokalnego, np. `C:\\Users\\<nazwa>\\test-inteligencji\\results.db`.
